@@ -1,0 +1,287 @@
+# SQL Exporter Configuration
+# This file defines database connections, SQL queries, and Prometheus metrics
+
+# Database connections
+databases:
+  # MySQL database example
+  mysql_db:
+    driver: mysql
+    host: localhost
+    port: 3306
+    database: myapp
+    username: ${MYSQL_USER:-user}
+    password: ${MYSQL_PASS:-password}
+
+  # PostgreSQL database example
+  postgres_db:
+    driver: postgresql
+    host: localhost
+    port: 5432
+    database: analytics
+    username: ${POSTGRES_USER:-postgres}
+    password: ${POSTGRES_PASS:-password}
+
+  # SQLite database example
+  sqlite_db:
+    driver: sqlite
+    database: ./data/app.db
+
+  # SQL Server database example
+  mssql_db:
+    driver: mssql
+    host: localhost
+    port: 1433
+    database: reporting
+    username: ${MSSQL_USER:-sa}
+    password: ${MSSQL_PASS:-password}
+
+# Query definitions and their associated metrics
+queries:
+  # Example 1: Simple gauge metric from a single value query
+  - name: user_count
+    database: mysql_db
+    interval: 60  # seconds
+    timeout: 30   # seconds
+    sql: |
+      SELECT COUNT(*) as value
+      FROM users
+      WHERE active = 1
+    metrics:
+      - name: active_users_total
+        help: "Total number of active users"
+        type: gauge
+        value_column: value
+
+  # Example 2: Metrics with labels from query results
+  - name: user_stats_by_region
+    database: postgres_db
+    interval: 120
+    timeout: 45
+    sql: |
+      SELECT
+        region,
+        user_type,
+        COUNT(*) as user_count,
+        AVG(login_frequency) as avg_login_freq
+      FROM user_analytics
+      WHERE created_at >= NOW() - INTERVAL '7 days'
+      GROUP BY region, user_type
+    metrics:
+      - name: users_by_region
+        help: "Number of users by region and type"
+        type: gauge
+        labels: [region, user_type]
+        value_column: user_count
+      - name: avg_login_frequency_by_region
+        help: "Average login frequency by region and type"
+        type: gauge
+        labels: [region, user_type]
+        value_column: avg_login_freq
+
+  # Example 3: Counter metric for cumulative values
+  - name: order_metrics
+    database: mysql_db
+    interval: 300
+    timeout: 60
+    sql: |
+      SELECT
+        status,
+        payment_method,
+        COUNT(*) as order_count,
+        SUM(total_amount) as total_revenue
+      FROM orders
+      WHERE created_at >= CURDATE()
+      GROUP BY status, payment_method
+    metrics:
+      - name: daily_orders_total
+        help: "Total daily orders by status and payment method"
+        type: counter
+        labels: [status, payment_method]
+        value_column: order_count
+      - name: daily_revenue_total
+        help: "Total daily revenue by status and payment method"
+        type: counter
+        labels: [status, payment_method]
+        value_column: total_revenue
+
+  # Example 4: Histogram for response time distribution
+  - name: api_response_times
+    database: postgres_db
+    interval: 60
+    timeout: 30
+    sql: |
+      SELECT
+        endpoint,
+        response_time_ms
+      FROM api_logs
+      WHERE timestamp >= NOW() - INTERVAL '1 minute'
+    metrics:
+      - name: api_response_time_seconds
+        help: "API response time distribution"
+        type: histogram
+        labels: [endpoint]
+        value_column: response_time_ms
+
+  # Example 5: Database health metrics
+  - name: database_health
+    database: mysql_db
+    interval: 30
+    timeout: 15
+    sql: |
+      SELECT
+        'connections' as metric_name,
+        VARIABLE_VALUE as value
+      FROM information_schema.GLOBAL_STATUS
+      WHERE VARIABLE_NAME = 'Threads_connected'
+      UNION ALL
+      SELECT
+        'queries_per_second' as metric_name,
+        VARIABLE_VALUE as value
+      FROM information_schema.GLOBAL_STATUS
+      WHERE VARIABLE_NAME = 'Queries'
+    metrics:
+      - name: mysql_connections
+        help: "Number of MySQL connections"
+        type: gauge
+        labels: [metric_name]
+        value_column: value
+
+  # PostgreSQL Examples
+  # Example 6: PostgreSQL database metrics
+  - name: postgres_database_metrics
+    database: postgres_db
+    interval: 300
+    timeout: 45
+    sql: |
+      SELECT
+        'database_size' as metric_name,
+        datname as database_name,
+        pg_database_size(datname) as value
+      FROM pg_database
+      WHERE datname NOT IN ('template0', 'template1', 'postgres')
+      UNION ALL
+      SELECT
+        'active_connections' as metric_name,
+        datname as database_name,
+        COUNT(*) as value
+      FROM pg_stat_activity
+      WHERE state = 'active' AND datname IS NOT NULL
+      GROUP BY datname
+    metrics:
+      - name: postgres_database_size_bytes
+        help: "PostgreSQL database size in bytes"
+        type: gauge
+        labels: [database_name, metric_name]
+        value_column: value
+
+  # Example 7: PostgreSQL table statistics
+  - name: postgres_table_stats
+    database: postgres_db
+    interval: 180
+    timeout: 60
+    sql: |
+      SELECT
+        schemaname,
+        tablename,
+        seq_scan,
+        seq_tup_read,
+        idx_scan,
+        idx_tup_fetch,
+        n_tup_ins as inserts,
+        n_tup_upd as updates,
+        n_tup_del as deletes,
+        n_live_tup as live_tuples,
+        n_dead_tup as dead_tuples
+      FROM pg_stat_user_tables
+      WHERE schemaname = 'public'
+    metrics:
+      - name: postgres_table_sequential_scans_total
+        help: "Total sequential scans on table"
+        type: counter
+        labels: [schemaname, tablename]
+        value_column: seq_scan
+      - name: postgres_table_index_scans_total
+        help: "Total index scans on table"
+        type: counter
+        labels: [schemaname, tablename]
+        value_column: idx_scan
+      - name: postgres_table_tuples_inserted_total
+        help: "Total tuples inserted"
+        type: counter
+        labels: [schemaname, tablename]
+        value_column: inserts
+      - name: postgres_table_live_tuples
+        help: "Number of live tuples in table"
+        type: gauge
+        labels: [schemaname, tablename]
+        value_column: live_tuples
+
+  # Example 8: PostgreSQL connection pool monitoring
+  - name: postgres_connections
+    database: postgres_db
+    interval: 30
+    timeout: 15
+    sql: |
+      SELECT
+        state,
+        datname as database,
+        usename as username,
+        COUNT(*) as connection_count
+      FROM pg_stat_activity
+      WHERE datname IS NOT NULL
+      GROUP BY state, datname, usename
+    metrics:
+      - name: postgres_connections_by_state
+        help: "Number of PostgreSQL connections by state"
+        type: gauge
+        labels: [state, database, username]
+        value_column: connection_count
+
+  # Example 9: PostgreSQL query performance
+  - name: postgres_slow_queries
+    database: postgres_db
+    interval: 120
+    timeout: 30
+    sql: |
+      SELECT
+        datname as database,
+        usename as username,
+        query_type,
+        COUNT(*) as query_count,
+        AVG(total_exec_time) as avg_exec_time,
+        MAX(total_exec_time) as max_exec_time
+      FROM (
+        SELECT
+          datname,
+          usename,
+          CASE
+            WHEN query ILIKE 'SELECT%' THEN 'SELECT'
+            WHEN query ILIKE 'INSERT%' THEN 'INSERT'
+            WHEN query ILIKE 'UPDATE%' THEN 'UPDATE'
+            WHEN query ILIKE 'DELETE%' THEN 'DELETE'
+            ELSE 'OTHER'
+          END as query_type,
+          total_exec_time
+        FROM pg_stat_statements pss
+        JOIN pg_database pd ON pss.dbid = pd.oid
+        JOIN pg_user pu ON pss.userid = pu.usesysid
+        WHERE total_exec_time > 1000  -- queries taking more than 1 second
+      ) slow_queries
+      GROUP BY datname, usename, query_type
+    metrics:
+      - name: postgres_slow_queries_total
+        help: "Number of slow queries by type"
+        type: counter
+        labels: [database, username, query_type]
+        value_column: query_count
+      - name: postgres_query_avg_exec_time_ms
+        help: "Average execution time for queries"
+        type: gauge
+        labels: [database, username, query_type]
+        value_column: avg_exec_time
+
+# Exporter configuration
+exporter:
+  host: "0.0.0.0"
+  port: 9090
+  log_level: "INFO"

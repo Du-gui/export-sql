@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql-exporter-service
+  namespace: monitoring
+  labels:
+    app: sql-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: sql-exporter
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql-exporter-nodeport
+  namespace: monitoring
+  labels:
+    app: sql-exporter
+spec:
+  type: NodePort
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    nodePort: 30090
+    protocol: TCP
+  selector:
+    app: sql-exporter

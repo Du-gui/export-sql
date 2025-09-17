@@ -1,0 +1,44 @@
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sql-exporter
+  namespace: monitoring
+  labels:
+    app: sql-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: sql-exporter
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - monitoring
+
+---
+# Alternative: PodMonitor for direct pod scraping
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: sql-exporter-pods
+  namespace: monitoring
+  labels:
+    app: sql-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: sql-exporter
+  podMetricsEndpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - monitoring

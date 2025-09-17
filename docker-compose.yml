@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  sql-exporter:
+    build: .
+    container_name: sql-exporter
+    ports:
+      - "${EXPORTER_PORT:-9090}:9090"
+    environment:
+      - EXPORTER_HOST=0.0.0.0
+      - EXPORTER_PORT=9090
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CONFIG_FILE=/app/config/config.yaml
+      # Database connections
+      - MYSQL_HOST=${MYSQL_HOST:-mysql}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_USER=${MYSQL_USER:-root}
+      - MYSQL_PASS=${MYSQL_PASS:-password}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-testdb}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASS=${POSTGRES_PASS:-password}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE:-testdb}
+    volumes:
+      - ./config:/app/config:ro
+      - ./sql:/app/sql:ro
+      - ./data:/app/data
+    depends_on:
+      - mysql
+      - postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:9090/metrics')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MySQL database for testing
+  mysql:
+    image: mysql:8.0
+    container_name: sql-exporter-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASS:-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-testdb}
+      MYSQL_USER: ${MYSQL_USER:-testuser}
+      MYSQL_PASSWORD: ${MYSQL_PASS:-password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./examples/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+  # PostgreSQL database for testing
+  postgres:
+    image: postgres:15
+    container_name: sql-exporter-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-testdb}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./examples/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+  # Prometheus for metrics collection (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sql-exporter-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./examples/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sql-exporter-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./examples/grafana/provisioning:/etc/grafana/provisioning:ro
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
