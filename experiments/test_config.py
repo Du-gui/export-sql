@@ -11,9 +11,9 @@ class SimpleConfig:
 
 # 创建配置测试
 test_config = {
-    'name' = 'test',
-    'value' = 20,
-    'optional_field' = 'hello'
+    'name': 'test',
+    'value': 20,
+    'optional_field': 'hello'
 }
 
 # 写入yaml文件
