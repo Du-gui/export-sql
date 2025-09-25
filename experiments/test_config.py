@@ -24,14 +24,14 @@ with open('test_config.yaml', 'w') as f:
 with open('test_config.yaml', 'r') as f:
     loaded_config = yaml.safe_load(f)
 
-print("原始配置": test_config)
-print("加载的配置": loaded_config)
+print("原始配置:", test_config)
+print("加载的配置:", loaded_config)
 
 # 转换为数据类
 config_obj = SimpleConfig(**loaded_config)
-pring("数据类对象": config_obj)
+pring("数据类对象:", config_obj)
 
 # 测试环境变量
 os.environ['TEST_VAR']  = 'from_environment'
 env_value = os.environ.get('TEST_VAT', 'defalut')
-print('环境变量的值': env_value)
+print('环境变量的值:', env_value)
