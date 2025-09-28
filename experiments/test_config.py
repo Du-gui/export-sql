@@ -30,6 +30,11 @@ print("加载的配置:", loaded_config)
 # 转换为数据类
 config_obj = SimpleConfig(**loaded_config)
 print("数据类对象:", config_obj)
+l_config_obj = list(config_obj)
+print(l_config_obj)
+print(l_config_obj[0])
+print(l_config_obj[1])
+print(l_config_obj[2])
 
 # 测试环境变量
 os.environ['TEST_VAR']  = 'from_environment'
