@@ -1,6 +1,6 @@
 import yaml
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, astuple
 from typing import Optional
 
 @dataclass
@@ -30,7 +30,7 @@ print("加载的配置:", loaded_config)
 # 转换为数据类
 config_obj = SimpleConfig(**loaded_config)
 print("数据类对象:", config_obj)
-l_config_obj = list(config_obj)
+l_config_obj = list(astuple(config_obj))
 print(l_config_obj)
 print(l_config_obj[0])
 print(l_config_obj[1])
